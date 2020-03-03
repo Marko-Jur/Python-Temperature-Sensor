@@ -1,0 +1,90 @@
+Dear ELEC291/292 students,
+
+A few problems I have seen so far with lab 3:
+
+1) Install PuTTY in C:\PuTTY.  If you install PuTTY in C:\Program Files* it may not work as needed.  The reason
+is that CrossIDE tries to create a file in the PuTTY folder.  That is not allowed in the C:\Program Files* unless
+you run as administrator.
+
+2) It seems that many of you are trying to send binary numbers to PuTTY.  PuTTY only understands ASCII. After you
+read from the ADC and convert to temperature you get a binary number.  The first step is to convert the
+binary number to BCD, and then convert the BCD to ASCII.  Then the ACCII codes can be send to the LCD or PuTTY via the
+serial port.  For example in mathtest.asm we have:
+
+Set_Cursor(1, 6);
+Display_BCD(#0x05)
+; Try subtracting 4567 - 1234 = 3333
+Load_x(4567)
+Load_y(1234)
+lcall sub32 ; This subroutine is in math32.asm
+lcall hex2bcd ; converts binary in x to BCD in BCD
+lcall Display_10_digit_BCD
+lcall wait_for_P4_5
+
+If you check Display_10_digit_BCD you'll see how the number is converted to ASCII from BCD:
+
+; Sends 10-digit BCD number in bcd to the LCD
+Display_10_digit_BCD:
+	Set_Cursor(2, 7)
+	Display_BCD(bcd+4)
+	Display_BCD(bcd+3)
+	Display_BCD(bcd+2)
+	Display_BCD(bcd+1)
+	Display_BCD(bcd+0)
+
+Display_BCD is a macro/subroutine combo in LCD_4bit.inc:
+
+;---------------------------------;
+; Display a BCD number in the LCD ;
+;---------------------------------;
+Display_BCD mac
+	push ar0
+	mov r0, %0
+	lcall ?Display_BCD
+	pop ar0
+endmac
+
+?Display_BCD:
+	push acc
+	; Write most significant digit
+	mov a, r0
+	swap a
+	anl a, #0fh
+	orl a, #30h
+	lcall ?WriteData
+	; write least significant digit
+	mov a, r0
+	anl a, #0fh
+	orl a, #30h
+	lcall ?WriteData
+	pop acc
+	ret
+
+We can easily modify it to send to PuTTY instead to print in the LCD:
+
+;---------------------------------;
+; Send a BCD number to PuTTY      ;
+;---------------------------------;
+Send_BCD mac
+	push ar0
+	mov r0, %0
+	lcall ?Send_BCD
+	pop ar0
+endmac
+
+?Send_BCD:
+	push acc
+	; Write most significant digit
+	mov a, r0
+	swap a
+	anl a, #0fh
+	orl a, #30h
+	lcall putchar
+	; write least significant digit
+	mov a, r0
+	anl a, #0fh
+	orl a, #30h
+	lcall putchar
+	pop acc
+	ret
+
